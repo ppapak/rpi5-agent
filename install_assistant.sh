@@ -133,6 +133,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 import os
+
+# --- Force Offline Environment ---
+os.environ["TRANSFORMERS_OFFLINE"] = "1"
+os.environ["HF_DATASETS_OFFLINE"] = "1"
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+
 import json
 import subprocess
 import pyaudio
@@ -152,6 +158,7 @@ from dotenv import load_dotenv
 
 # Third-party dependencies
 import chromadb
+from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from vosk import Model, KaldiRecognizer
 
@@ -169,7 +176,6 @@ except Exception:
     pass
 
 # --- Configuration Mapping ---
-# All sensitive and environment-specific variables are now pulled from os.environ
 AGENT_NAME = os.getenv("AGENT_NAME", "Agent")
 WAKE_WORD = AGENT_NAME.lower()
 BASE_DIR = os.getenv("BASE_DIR", "")
@@ -232,9 +238,20 @@ class Memory:
     def __init__(self, path):
         self.path = path
         self.workspace_dir = os.path.dirname(path)
-        self.chroma_client = chromadb.PersistentClient(path=os.path.join(self.workspace_dir, ".chroma_db"))
-        self.emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
-        self.knowledge_col = self.chroma_client.get_or_create_collection("knowledge", embedding_function=self.emb_fn)
+        # Disable ChromaDB telemetry for offline use
+        self.chroma_client = chromadb.PersistentClient(
+            path=os.path.join(self.workspace_dir, ".chroma_db"),
+            settings=Settings(anonymized_telemetry=False)
+        )
+        # Model must be present in local cache (~/.cache/torch or similar)
+        self.emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
+            model_name="all-MiniLM-L6-v2",
+            device="cpu"
+        )
+        self.knowledge_col = self.chroma_client.get_or_create_collection(
+            "knowledge", 
+            embedding_function=self.emb_fn
+        )
         self.file_registry = {} 
 
     def save(self, u, a):

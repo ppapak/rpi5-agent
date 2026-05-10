@@ -8,7 +8,8 @@ fi
 
 echo "--- PHASE 1: SYSTEM UPDATES ---"
 swapoff -a
-apt update && apt install -y locales-all git alsa-utils
+apt update && apt upgrade -y
+apt install -y locales-all git alsa-utils
 
 echo "--- PHASE 2: LOCALE & SSH ---"
 # Use a single sed command to handle multiple changes
