@@ -7,6 +7,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 echo "--- PHASE 1: SYSTEM UPDATES ---"
+
 swapoff -a
 apt update && apt upgrade -y
 apt install -y locales-all git alsa-utils
