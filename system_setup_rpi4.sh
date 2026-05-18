@@ -51,7 +51,11 @@ pcm.softvol {
     control {
         name "Master"
         card "sndrpigooglevoi"
+        count 2
     }
+    min_dB -51.0
+    max_dB 0.0
+    resolution 256
 }
 
 pcm.micboost {
@@ -60,7 +64,11 @@ pcm.micboost {
     control {
         name "MicMaster"
         card "sndrpigooglevoi"
+        count 1
     }
+    min_dB -3.0
+    max_dB 30.0
+    resolution 100
 }
 
 pcm.speaker_mixer {
@@ -71,6 +79,7 @@ pcm.speaker_mixer {
         slave {
             pcm "hw:sndrpigooglevoi,0"
             rate 48000
+            channels 2
             period_time 0
             period_size 1024
             buffer_size 4096
@@ -94,7 +103,19 @@ ctl.!default {
 }
 SOUND
 
+#reduce sound volume 
 amixer -c sndrpigooglevoi sset Master 70%
+
+#fix swap file size to 4GB
+sudo mkdir -p /etc/rpi/swap.conf.d
+sudo tee /etc/rpi/swap.conf.d/80-fixedswap.conf << EOF
+[Main]
+Mechanism=swapfile
+[File]
+FixedSizeMiB=4096
+EOF
+
+#turn on usb gadget mode
 rpi-usb-gadget on
 
 echo "----------------------------------------------------"
