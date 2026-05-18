@@ -1,3 +1,115 @@
+#!/bin/bash
+set -euo pipefail
+
+# ============================================================
+# 1. IDENTITY & SYSTEM DEPENDENCIES
+# ============================================================
+REAL_USER=${SUDO_USER:-$(whoami)}
+USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
+BASE_DIR="$USER_HOME/native-ai"
+MODEL_DIR="$BASE_DIR/models"
+MODEL_FILE="$MODEL_DIR/TinyLlama-1.1B.gguf"
+
+echo "--- Deploying for User: $REAL_USER in $BASE_DIR ---"
+
+echo "[1/7] Verifying system dependencies..."
+sudo apt-get update -qq
+sudo apt-get install -y -qq git build-essential cmake portaudio19-dev python3-venv python3-dev unzip curl wget alsa-utils
+
+# CRITICAL FIX: Ensure user has hardware audio access
+sudo usermod -aG audio "$REAL_USER"
+
+mkdir -p "$MODEL_DIR" "$BASE_DIR/piper" "$BASE_DIR/workspace"
+
+# ============================================================
+# 2. GENERATE UNINSTALL SCRIPT
+# ============================================================
+cat << 'UN' > "$BASE_DIR/uninstall.sh"
+#!/bin/bash
+echo "--- Starting Removal ---"
+sudo systemctl stop voice-assistant llama-server 2>/dev/null || true
+sudo systemctl disable voice-assistant llama-server 2>/dev/null || true
+sudo rm -f /etc/systemd/system/voice-assistant.service
+sudo rm -f /etc/systemd/system/llama-server.service
+sudo systemctl daemon-reload
+
+BASE_DIR="$(dirname "$(realpath "$0")")"
+sudo rm -f /tmp/assistant_beep.wav
+if [ -d "$BASE_DIR" ]; then
+    echo "Deleting $BASE_DIR..."
+    rm -rf "$BASE_DIR"
+fi
+echo "--- REMOVAL COMPLETE ---"
+UN
+chmod +x "$BASE_DIR/uninstall.sh"
+
+# ============================================================
+# 3. LLAMA.CPP COMPILATION
+# ============================================================
+echo "[2/7] Checking Inference Engine..."
+if [ ! -f "$BASE_DIR/llama.cpp/build/bin/llama-server" ]; then
+    echo "Cloning and building llama.cpp (this will take a moment)..."
+    cd "$BASE_DIR"
+    git clone https://github.com/ggerganov/llama.cpp
+    cd llama.cpp
+    mkdir build && cd build
+    cmake ..
+    cmake --build . --config Release -j 4
+else
+    echo "[*] llama-server binary exists."
+fi
+
+# ============================================================
+# 4. ASSET DOWNLOADS
+# ============================================================
+echo "[3/7] Syncing Models and Voice Assets..."
+mount -o remount,size=4G /tmp
+
+# LLM
+if [ ! -f "$MODEL_FILE" ]; then
+   wget https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf -O "$MODEL_FILE"
+fi
+
+# Piper TTS
+cd "$BASE_DIR/piper"
+if [ ! -f "piper/piper" ]; then
+    wget -qnc https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_arm64.tar.gz
+    tar -xf piper_arm64.tar.gz
+fi
+
+if [ ! -f "en_US-lessac-medium.onnx" ]; then
+    wget -qnc https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx -O en_US-lessac-medium.onnx
+fi
+
+if [ ! -f "en_US-lessac-medium.onnx.json" ]; then
+    wget -qnc https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json -O en_US-lessac-medium.onnx.json
+fi
+
+# CRITICAL FIX: Vosk STT Model (Was missing entirely)
+cd "$BASE_DIR"
+if [ ! -d "vosk-model-small-en-us-0.15" ]; then
+    wget -qnc https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+    unzip -q vosk-model-small-en-us-0.15.zip
+    rm vosk-model-small-en-us-0.15.zip
+fi
+
+# ============================================================
+# 5. PYTHON ENVIRONMENT
+# ============================================================
+echo "[4/7] Configuring Virtual Environment..."
+cd "$BASE_DIR"
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+fi
+./venv/bin/pip install --upgrade -q pip
+# CRITICAL FIX: Added chromadb and sentence-transformers
+./venv/bin/pip install -q vosk requests pyaudio chromadb sentence-transformers python-dotenv
+
+# ============================================================
+# 6. ASSISTANT ORCHESTRATOR
+# ============================================================
+echo "[5/7] Writing Orchestrator Logic..."
+cat << 'PYTHON' > "$BASE_DIR/assistant.py"
 """
 MIT License
 
@@ -341,3 +453,56 @@ def main():
 
 if __name__ == "__main__":
     main()
+PYTHON
+
+# Inject dynamic BASE_DIR
+sed -i "s|PATH_PLACEHOLDER|$BASE_DIR|" "$BASE_DIR/assistant.py"
+
+# ============================================================
+# 7. SYSTEMD SERVICES
+# ============================================================
+echo "[6/7] Installing Systemd Services..."
+sudo tee /etc/systemd/system/llama-server.service > /dev/null <<EOF
+[Unit]
+Description=Llama Server
+After=network.target
+[Service]
+User=$REAL_USER
+WorkingDirectory=$BASE_DIR
+ExecStart=$BASE_DIR/llama.cpp/build/bin/llama-server -m $MODEL_FILE -c 4096 --threads 4 --prio 2 --no-mmap
+Restart=always
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# CRITICAL FIX: Ensure ALSA/Pulse environments are set so background PyAudio works
+sudo tee /etc/systemd/system/voice-assistant.service > /dev/null <<EOF
+[Unit]
+Description=Voice Assistant
+After=llama-server.service sound.target
+Requires=sound.target
+[Service]
+User=$REAL_USER
+WorkingDirectory=$BASE_DIR
+Environment="XDG_RUNTIME_DIR=/run/user/$(id -u $REAL_USER)"
+ExecStart=$BASE_DIR/venv/bin/python3 $BASE_DIR/assistant.py
+Restart=always
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=50
+Nice=-15
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# ============================================================
+# 8. START
+# ============================================================
+echo "[7/7] Launching Services..."
+sudo chown -R $REAL_USER:$REAL_USER "$BASE_DIR"
+
+sudo systemctl daemon-reload
+sudo systemctl enable llama-server voice-assistant
+sudo systemctl restart llama-server voice-assistant
+
+echo "--- DEPLOYMENT COMPLETE ---"
+echo "To uninstall, run: $BASE_DIR/uninstall.sh"

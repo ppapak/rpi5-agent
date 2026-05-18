@@ -133,6 +133,51 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# --- Configuration Mapping ---
+AGENT_NAME = os.getenv("AGENT_NAME", "Agent")
+WAKE_WORD = AGENT_NAME.lower()
+BASE_DIR = os.getenv("BASE_DIR", "")
+
+if not BASE_DIR:
+    raise ValueError("BASE_DIR not set in environment. Check your .env file.")
+
+WORKSPACE_DIR = os.path.join(BASE_DIR, "workspace")
+HISTORY_FILE = os.path.join(WORKSPACE_DIR, "history.md")
+BEEP_FILE = "/tmp/assistant_beep.wav"
+
+# Model Paths
+MODEL_PATH = os.path.join(BASE_DIR, os.getenv("VOSK_MODEL_NAME", "vosk-model-small-en-us-0.15"))
+PIPER_PATH = os.path.join(BASE_DIR, os.getenv("PIPER_BIN_PATH", "piper/piper/piper"))
+VOICE_MODEL = os.path.join(BASE_DIR, os.getenv("PIPER_MODEL_NAME", "piper/en_US-lessac-medium.onnx"))
+EMBEDDING_MODEL_SETTING = os.getenv("EMBEDDING_MODEL_NAME_OR_PATH", "all-MiniLM-L6-v2")
+
+# Robust multi-layer path resolution for the embedding model
+if os.path.exists(EMBEDDING_MODEL_SETTING):
+    EMBEDDING_MODEL = EMBEDDING_MODEL_SETTING
+elif os.path.exists(os.path.join(BASE_DIR, EMBEDDING_MODEL_SETTING)):
+    EMBEDDING_MODEL = os.path.join(BASE_DIR, EMBEDDING_MODEL_SETTING)
+else:
+    EMBEDDING_MODEL = os.path.join(BASE_DIR, EMBEDDING_MODEL_SETTING)
+
+# Conditional online download block executed prior to enforcing offline mode
+if not os.path.exists(EMBEDDING_MODEL):
+    print(f"Embedding model not found at local path: {EMBEDDING_MODEL}")
+    print("Connecting to Hugging Face to download required model files...")
+    try:
+        from huggingface_hub import snapshot_download
+        snapshot_download(
+            repo_id="sentence-transformers/all-MiniLM-L6-v2",
+            local_dir=EMBEDDING_MODEL,
+            local_files_only=False
+        )
+        print("Model downloaded successfully.")
+    except Exception as e:
+        print(f"Network download failed: {e}")
 
 # --- Force Offline Environment ---
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
@@ -154,16 +199,12 @@ import hashlib
 import datetime
 from pathlib import Path
 from ctypes import *
-from dotenv import load_dotenv
 
 # Third-party dependencies
 import chromadb
 from chromadb.config import Settings
 from chromadb.utils import embedding_functions
 from vosk import Model, KaldiRecognizer
-
-# Load environment variables from .env file
-load_dotenv()
 
 # --- ALSA Error Suppression ---
 def py_error_handler(filename, line, function, err, fmt): pass
@@ -174,23 +215,6 @@ try:
     asound.snd_lib_error_set_handler(c_error_handler)
 except Exception:
     pass
-
-# --- Configuration Mapping ---
-AGENT_NAME = os.getenv("AGENT_NAME", "Agent")
-WAKE_WORD = AGENT_NAME.lower()
-BASE_DIR = os.getenv("BASE_DIR", "")
-
-if not BASE_DIR:
-    raise ValueError("BASE_DIR not set in environment. Check your .env file.")
-
-WORKSPACE_DIR = os.path.join(BASE_DIR, "workspace")
-HISTORY_FILE = os.path.join(WORKSPACE_DIR, "history.md")
-BEEP_FILE = "/tmp/assistant_beep.wav"
-
-# Model Paths
-MODEL_PATH = os.path.join(BASE_DIR, os.getenv("VOSK_MODEL_NAME", "vosk-model-small-en-us-0.15"))
-PIPER_PATH = os.path.join(BASE_DIR, os.getenv("PIPER_BIN_PATH", "piper/piper/piper"))
-VOICE_MODEL = os.path.join(BASE_DIR, os.getenv("PIPER_MODEL_NAME", "piper/en_US-lessac-medium.onnx"))
 
 # API URLs
 LLAMA_API_URL = os.getenv("LLAMA_API_URL", "http://localhost:8080/completion")
@@ -243,9 +267,9 @@ class Memory:
             path=os.path.join(self.workspace_dir, ".chroma_db"),
             settings=Settings(anonymized_telemetry=False)
         )
-        # Model must be present in local cache (~/.cache/torch or similar)
+        # Model must be present in local cache or local directory path
         self.emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2",
+            model_name=EMBEDDING_MODEL,
             device="cpu"
         )
         self.knowledge_col = self.chroma_client.get_or_create_collection(
