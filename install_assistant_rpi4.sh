@@ -8,7 +8,7 @@ REAL_USER=${SUDO_USER:-$(whoami)}
 USER_HOME=$(getent passwd "$REAL_USER" | cut -d: -f6)
 BASE_DIR="$USER_HOME/native-ai"
 MODEL_DIR="$BASE_DIR/models"
-MODEL_FILE="$MODEL_DIR/TinyLlama-1.1B.gguf"
+MODEL_FILE="$MODEL_DIR/gemma-4-e2b.gguf"
 
 echo "--- Deploying for User: $REAL_USER in $BASE_DIR ---"
 
@@ -67,7 +67,7 @@ mount -o remount,size=4G /tmp
 
 # LLM
 if [ ! -f "$MODEL_FILE" ]; then
-   wget https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf -O "$MODEL_FILE"
+    wget -nc https://huggingface.co/bartowski/google_gemma-4-E2B-it-GGUF/resolve/main/google_gemma-4-E2B-it-Q2_K.gguf -O "$MODEL_FILE"
 fi
 
 # Piper TTS
@@ -469,7 +469,7 @@ After=network.target
 [Service]
 User=$REAL_USER
 WorkingDirectory=$BASE_DIR
-ExecStart=$BASE_DIR/llama.cpp/build/bin/llama-server -m $MODEL_FILE -c 4096 --threads 4 --prio 2 --no-mmap
+ExecStart=$BASE_DIR/llama.cpp/build/bin/llama-server -m $MODEL_FILE -c 2048 --threads 4 --prio 2 --no-mmap
 Restart=always
 [Install]
 WantedBy=multi-user.target
