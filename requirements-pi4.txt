@@ -1,0 +1,8 @@
+-r requirements.txt
+
+# FEATURE_VISION: the DNN runner. picamera2 itself comes from apt
+# (python3-picamera2), which is why the Pi 4 venv uses --system-site-packages.
+opencv-python-headless
+
+# FEATURE_BATTERY: I2C access for the INA219 gauge.
+smbus2

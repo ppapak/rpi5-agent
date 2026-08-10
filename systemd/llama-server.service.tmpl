@@ -1,0 +1,12 @@
+[Unit]
+Description=Llama Server (Native-AI)
+After=network.target
+
+[Service]
+User=@USER@
+WorkingDirectory=@BASE_DIR@
+ExecStart=@BASE_DIR@/llama.cpp/build/bin/llama-server -m @MODEL_FILE@ -c @LLM_CTX@ --threads @LLM_THREADS@ --prio 2 --no-mmap
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

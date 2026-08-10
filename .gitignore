@@ -1,0 +1,27 @@
+.DS_Store
+
+# Local secrets and machine-specific config
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.pytest_cache/
+
+# Downloaded assets and build output — several GB, all reproducible by the installer
+models/
+*.gguf
+llama.cpp/
+piper/
+vosk-model-*
+vision/
+all-MiniLM-L6-v2/
+
+# Runtime state
+workspace/
+.chroma_db/
+requirements.lock
+
+# Personal helper, not part of the project
+nuke.sh

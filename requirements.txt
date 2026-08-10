@@ -1,0 +1,10 @@
+# Base runtime, needed on every board.
+#
+# Unpinned on purpose: piwheels serves whatever arm64 builds exist for the
+# running Python version, and hard pins here have broken installs across OS
+# upgrades. For reproducibility, freeze on-device instead:
+#   venv/bin/pip freeze > requirements.lock
+vosk
+requests
+pyaudio
+python-dotenv

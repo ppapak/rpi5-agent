@@ -1,0 +1,20 @@
+[Unit]
+Description=Voice Assistant (Native-AI)
+After=llama-server.service sound.target
+Requires=sound.target
+
+[Service]
+User=@USER@
+WorkingDirectory=@BASE_DIR@
+# PyAudio needs a runtime dir to reach ALSA from a background service.
+Environment="XDG_RUNTIME_DIR=/run/user/@UID@"
+Environment="PYTHONPATH=@BASE_DIR@"
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=@BASE_DIR@/venv/bin/python3 -m native_ai
+Restart=always
+CPUSchedulingPolicy=rr
+CPUSchedulingPriority=50
+Nice=-15
+
+[Install]
+WantedBy=multi-user.target

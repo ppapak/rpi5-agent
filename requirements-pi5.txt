@@ -1,0 +1,8 @@
+-r requirements.txt
+
+# FEATURE_RAG: workspace retrieval. Pulls torch, so roughly 700 MB of wheels —
+# only worth installing on a board that actually enables RAG.
+chromadb
+sentence-transformers
+# Fetches the embedding model once, before config.py enforces offline mode.
+huggingface_hub
