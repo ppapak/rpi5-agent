@@ -1,11 +1,10 @@
-# Optional Tools: Web Search and Email
+# Optional Tools
 
 With `FEATURE_TOOLS=1`, the assistant can act rather than only answer. The
 system prompt gains a tool block, and the streaming loop watches for a bracketed
 call:
 
 ```
-[SEARCH: query]
 [WRITE: name.md | content]
 [EMAIL: subject | body]
 ```
@@ -14,6 +13,9 @@ When one appears the stream is cut short, the tool runs, and its result is fed
 back as an observation for a second pass. Nothing is spoken while a partial tool
 call is in the buffer, so you never hear the assistant read out its own syntax.
 
+Both tools are local. The assistant makes no outbound network calls of its own —
+the only traffic it generates is SMTP, and only when you ask it to send mail.
+
 This is a Pi 5 feature. It is off by default on the Pi 4, where the 0.5B model
 is not reliable enough at emitting well-formed calls.
 
@@ -21,7 +23,6 @@ is not reliable enough at emitting well-formed calls.
 
 | Tool | Backed by | Notes |
 | :--- | :--- | :--- |
-| `SEARCH` | A local SearXNG instance | Returns the top 3 results, truncated to 1000 characters. |
 | `WRITE` | `$BASE_DIR/workspace/` | Confined to the workspace; `history.md` is protected. With RAG on, whatever it writes is indexed within seconds and becomes answerable. |
 | `EMAIL` | SMTP | Sends to the fixed `RECEIVER_EMAIL`; the model is never given an address to choose. |
 
@@ -29,37 +30,15 @@ is not reliable enough at emitting well-formed calls.
 model that emits `../../etc/passwd` gets an "Access Denied" observation rather
 than a write.
 
-## Web search
+## Enabling
 
-Search runs through a local [SearXNG](https://github.com/searxng/searxng) in
-Docker — a metasearch proxy, so no query carries your identity, and the
-assistant only ever talks to `localhost`.
-
-```bash
-./scripts/install-searxng.sh
-```
-
-It installs Docker if missing, generates a persistent secret, enables the JSON
-API, and runs the container on port `8081` with `--cap-drop ALL`. Verify:
-
-```bash
-curl "http://localhost:8081/search?q=test&format=json" | head -c 200
-```
-
-Then, in `$BASE_DIR/.env`:
+In `$BASE_DIR/.env`:
 
 ```ini
 FEATURE_TOOLS=1
-SEARXNG_URL=http://localhost:8081/
 ```
 
-Search is off by default because it is the one part of the system that reaches
-the public internet. Everything else runs offline; enabling this trades some of
-that for current information.
-
-## Email
-
-Add SMTP credentials to `$BASE_DIR/.env`:
+`EMAIL` additionally needs SMTP credentials:
 
 ```ini
 SMTP_SERVER=smtp.gmail.com
@@ -71,7 +50,8 @@ RECEIVER_EMAIL=you@example.com
 
 Use an app-specific password, never your account password — `.env` stores it in
 plaintext. Keep the file at mode `600`, and remember it is *not* removed by
-anything except `uninstall.sh`.
+anything except `uninstall.sh`. With `SMTP_SERVER` unset, `EMAIL` returns
+"Error: SMTP is not configured" instead of failing at the socket.
 
 Restart to apply:
 
@@ -81,10 +61,22 @@ sudo systemctl restart voice-assistant
 
 ## Trying it
 
-> *"Agent, search for today's weather in Athens."*
 > *"Agent, write a note called groceries dot md with milk and bread."*
 > *"Agent, email me a summary of that."*
 
 Tool activity is logged as `[OBSERVATION: ...]` in
 `journalctl -u voice-assistant -f`, which is the first place to look when a tool
 appears to do nothing.
+
+## Adding a tool
+
+1. Write the function in [`src/native_ai/tools.py`](../src/native_ai/tools.py).
+   Return a short string — it goes back to the model as an observation, and a
+   long one crowds out the context.
+2. Add its verb to `TOOL_PATTERN` and to `dispatch()`.
+3. Document the syntax in `TOOLS_BLOCK` in
+   [`src/native_ai/prompts.py`](../src/native_ai/prompts.py); that block is what
+   the model actually sees.
+
+Keep the count low. Every tool listed costs context on every single turn,
+whether or not it is used.

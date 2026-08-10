@@ -32,7 +32,7 @@ hardware changed.
 | `FEATURE_RAG` | Retrieval over `workspace/` via ChromaDB. Needs the `requirements-pi5.txt` dependencies. |
 | `FEATURE_VISION` | Camera object detection. Needs opencv and picamera2. |
 | `FEATURE_BATTERY` | INA219 telemetry. Needs `smbus2` and I²C enabled. |
-| `FEATURE_TOOLS` | `[SEARCH:]` / `[WRITE:]` / `[EMAIL:]` tool calls — see [searxng.md](searxng.md). |
+| `FEATURE_TOOLS` | `[WRITE:]` / `[EMAIL:]` tool calls — see [tools.md](tools.md). |
 
 Turning a feature on without its dependencies installed will fail at startup.
 Add the packages to the board's requirements file and re-run the installer.
@@ -70,8 +70,8 @@ new installs should use the names above.
 
 ### Tools
 
-`SEARXNG_URL`, `SMTP_SERVER`, `SMTP_PORT`, `SENDER_EMAIL`, `SENDER_PASSWORD`,
-`RECEIVER_EMAIL` — only read when `FEATURE_TOOLS=1`. See [searxng.md](searxng.md).
+`SMTP_SERVER`, `SMTP_PORT`, `SENDER_EMAIL`, `SENDER_PASSWORD`, `RECEIVER_EMAIL`
+— only read when `FEATURE_TOOLS=1`. See [tools.md](tools.md).
 
 `.env` is gitignored and holds a password in plaintext. Keep it at mode `600`.
 

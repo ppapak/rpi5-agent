@@ -25,3 +25,4 @@ requirements.lock
 
 # Personal helper, not part of the project
 nuke.sh
+.claude/

@@ -10,7 +10,6 @@ from . import config
 
 TOOLS_BLOCK = (
     "Tools:\n"
-    "- [SEARCH: query]\n"
     "- [WRITE: name.md | content]\n"
     "- [EMAIL: subject | body] Do not ask for my email address. The tool has it.\n"
     "MANDATORY: Speak response fully, then use tools at the end.\n"

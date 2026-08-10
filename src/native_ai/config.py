@@ -74,7 +74,6 @@ VISION_MODEL_URL = "https://github.com/spmallick/learnopencv/raw/master/Deep-Lea
 VISION_CONFIDENCE = float(os.getenv("VISION_CONFIDENCE", "0.30"))
 
 # --- Tools (optional) ---
-SEARXNG_URL = os.getenv("SEARXNG_URL", "http://localhost:8081/")
 SMTP_SERVER = os.getenv("SMTP_SERVER", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "")

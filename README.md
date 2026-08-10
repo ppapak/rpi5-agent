@@ -17,7 +17,7 @@ One codebase serves both boards. `scripts/install.sh` reads `/proc/device-tree/m
 | **RAG over `workspace/`** | ✅ | — (no headroom for ChromaDB) |
 | **Camera object detection** | — | ✅ MobileNet-SSD via Picamera2 |
 | **Battery telemetry** | — | ✅ INA219 over I²C |
-| **Tool calls (search/write/email)** | ✅ optional | — |
+| **Tool calls (write/email)** | ✅ optional | — |
 
 Adding a third board means writing one file in [profiles/](profiles/) — see [docs/configuration.md](docs/configuration.md#adding-a-board).
 
@@ -76,7 +76,7 @@ docs/           setup, install, configuration, and add-on guides
 | [docs/system-setup.md](docs/system-setup.md) | First-boot OS, firmware, and audio provisioning |
 | [docs/install.md](docs/install.md) | Deploying the assistant and managing the services |
 | [docs/configuration.md](docs/configuration.md) | Every `.env` key, every profile key, adding a board |
-| [docs/searxng.md](docs/searxng.md) | Optional web search and email tools |
+| [docs/tools.md](docs/tools.md) | Optional file-writing and email tools |
 
 ## 📄 License
 

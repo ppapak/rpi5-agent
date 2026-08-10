@@ -60,8 +60,6 @@ def send_email(subject, body):
 
 def dispatch(tool_type, argument):
     """Run one parsed tool call and return the observation string."""
-    if tool_type == "SEARCH":
-        return web_search(argument)
     if tool_type == "WRITE" and "|" in argument:
         name, content = argument.split("|", 1)
         return write_file(name.strip(), content.strip())
