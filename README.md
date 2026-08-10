@@ -58,6 +58,9 @@ The assistant runs several threads so the voice loop never blocks on heavy I/O.
 3. **Piper TTS worker** — consumes text fragments and speaks them. The LLM stream is cut into clauses on the fly, so speech starts while the model is still writing.
 4. **Vision worker** *(Pi 4)* — captures a frame on demand and names what it sees.
 
+Dashed boxes in the diagram exist only when their `FEATURE_*` flag is set. The
+editable source is [docs/flow.svg](docs/flow.svg).
+
 ## 📁 Layout
 
 ```
